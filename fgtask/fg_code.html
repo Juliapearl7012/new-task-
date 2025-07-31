@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab.js Excel Link Experiment</title>
+    <!--
+        Include the Lab.js library from a CDN. This is the core framework for the experiment.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/lab.js@latest/dist/lab.min.js"></script>
+    <style>
+        /*
+            Basic styling for the experiment screens.
+            This centers the content and provides a clean, readable font.
+        */
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        .content {
+            text-align: center;
+            font-size: 3em;
+            font-weight: bold;
+        }
+
+        /* Loading indicator styling */
+        #loading-message {
+            font-size: 1.5em;
+            color: #555;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="loading-message">Loading experiment data from words.csv...</div>
+    </div>
+
+    <script>
+        // Use a function to wrap the entire script to avoid global scope pollution.
+        (async function() {
+            // =========================================================================
+            //  STEP 1: FETCH AND PARSE THE CSV DATA
+            // =========================================================================
+            let experimentData = [];
+            try {
+                // Fetch the words.csv file from the same directory as this HTML file.
+                const response = await fetch('words.csv');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const csvText = await response.text();
+
+                // Use the correct Lab.js utility function to parse the CSV string.
+                experimentData = lab.util.data.fromCsv(csvText);
+            } catch (error) {
+                console.error('Failed to load CSV file:', error);
+                const appElement = document.getElementById('app');
+                appElement.innerHTML = `
+                    <h1 style="color: red;">Error: Could not load data from 'words.csv'.</h1>
+                    <p>This is likely due to running the file directly from your computer, which browsers often block for security reasons.</p>
+                    <p>To fix this:</p>
+                    <ul>
+                        <li>**Option 1: Use a simple web server.** You can run a local web server (e.g., using Python's <code>http.server</code>).</li>
+                        <li>**Option 2: Use GitHub Pages.** Host your files on a public platform like GitHub Pages, as we discussed previously.</li>
+                    </ul>
+                    <p>Please also ensure that 'words.csv' is in the same folder as this HTML file.</p>
+                `;
+                return; // Stop the script if data loading fails.
+            }
+
+            // =========================================================================
+            //  STEP 2: CREATE THE EXPERIMENT COMPONENTS
+            // =========================================================================
+            
+            // The main experiment loop, which will iterate through each word.
+            const wordLoop = new lab.flow.Loop({
+                template: new lab.html.Screen({
+                    title: 'Word Presentation',
+                    // The core part: display the 'Word' from the current item in the list.
+                    // The field name 'Word' must match the header in your CSV file.
+                    content: '<h1>${ this.state.Word }</h1>',
+                    // This sets the duration for which each word is displayed.
+                    timeout: 45000, // 45000 milliseconds = 45 seconds.
+                    // The screen will automatically advance after the timeout.
+                    responses: {
+                        'keydown(any)': 'advance' // A fallback to advance with any key press.
+                    }
+                }),
+                datacomponent: 'word_loop',
+                // This is where the experiment data is passed to the loop.
+                templateParameters: experimentData
+            });
+
+            // The thank you screen is a simple component shown after all words are presented.
+            const thankYouScreen = new lab.html.Screen({
+                title: 'End of Experiment',
+                content: '<h1>Thank you!</h1><p>The experiment is now complete.</p>',
+                // The screen will automatically close the experiment after 5 seconds.
+                timeout: 5000
+            });
+
+            // =========================================================================
+            //  STEP 3: ASSEMBLE AND START THE EXPERIMENT
+            // =========================================================================
+            // Create a sequence to hold the components.
+            const mainSequence = new lab.flow.Sequence({
+                datacomponent: 'main_sequence',
+                content: [
+                    wordLoop,
+                    thankYouScreen
+                ]
+            });
+
+            // Create and run the experiment.
+            const experiment = new lab.core.Experiment({
+                'content': mainSequence
+            });
+            
+            // Hook the experiment to the 'app' div in the HTML body.
+            const appElement = document.getElementById('app');
+            appElement.innerHTML = ''; // Clear the loading message
+            experiment.run(appElement);
+        })();
+    </script>
+</body>
+</html>
